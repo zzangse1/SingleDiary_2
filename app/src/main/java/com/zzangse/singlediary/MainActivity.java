@@ -125,6 +125,11 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
+    @Override
+    public void showFragment2(Note item) {
+
+    }
+
     public void showToast(String msg) {
         Toast.makeText(this,msg,Toast.LENGTH_SHORT).show();;
     }

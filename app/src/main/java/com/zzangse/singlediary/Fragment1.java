@@ -1,34 +1,60 @@
 package com.zzangse.singlediary;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.os.Bundle;
-
-import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.LinearLayout;
 import android.widget.Toast;
+
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.zzangse.singlediary.AppConstants;
+import com.zzangse.singlediary.Note;
+import com.zzangse.singlediary.NoteAdapter;
+import com.zzangse.singlediary.NoteDatabase;
+import com.zzangse.singlediary.OnNoteItemClickListener;
+import com.zzangse.singlediary.OnTabItemSelectedListener;
+
+import java.util.ArrayList;
+import java.util.Date;
 
 import lib.kingja.switchbutton.SwitchMultiButton;
 
+
+/**
+ * 날씨 아이콘
+ *
+ * ① 맑음
+ * ② 구름 조금
+ * ③ 구름 많음
+ * ④ 흐림
+ * ⑤ 비
+ * ⑥ 눈/비
+ * ⑦ 눈
+ */
 public class Fragment1 extends Fragment {
+    private static final String TAG = "Fragment1";
+
     RecyclerView recyclerView;
     NoteAdapter adapter;
+
     Context context;
     OnTabItemSelectedListener listener;
 
     @Override
-    public void onAttach(@NonNull Context context) {
+    public void onAttach(Context context) {
         super.onAttach(context);
+
         this.context = context;
+
         if (context instanceof OnTabItemSelectedListener) {
-            listener=(OnTabItemSelectedListener) context;
+            listener = (OnTabItemSelectedListener) context;
         }
     }
 
@@ -37,50 +63,58 @@ public class Fragment1 extends Fragment {
         super.onDetach();
 
         if (context != null) {
-            context=null;
-            listener=null;
+            context = null;
+            listener = null;
         }
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        ViewGroup rootView = (ViewGroup) inflater.inflate(R.layout.fragment1,container,false);
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        ViewGroup rootView = (ViewGroup) inflater.inflate(R.layout.fragment1, container, false);
 
         initUI(rootView);
+
+        // 데이터 로딩
+        loadNoteListData();
+
         return rootView;
     }
-    public void initUI(ViewGroup viewGroup){
-        Button todayWriteBtn = viewGroup.findViewById(R.id.fragment1_Btn);
-        todayWriteBtn.setOnClickListener(new View.OnClickListener() {
+
+
+    private void initUI(ViewGroup rootView) {
+
+        Button todayWriteButton = rootView.findViewById(R.id.fragment1_Btn);
+        todayWriteButton.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View view) {
+            public void onClick(View v) {
                 if (listener != null) {
                     listener.onTabSelected(1);
                 }
             }
         });
-        SwitchMultiButton switchMultiButton = viewGroup.findViewById(R.id.fragment1_switchBtn);
-        switchMultiButton.setOnSwitchListener(new SwitchMultiButton.OnSwitchListener() {
+
+        SwitchMultiButton switchButton = rootView.findViewById(R.id.fragment1_switchBtn);
+        switchButton.setOnSwitchListener(new SwitchMultiButton.OnSwitchListener() {
             @Override
             public void onSwitch(int position, String tabText) {
-                Toast.makeText(getContext(),tabText,Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), tabText, Toast.LENGTH_SHORT).show();
+
                 adapter.switchLayout(position);
                 adapter.notifyDataSetChanged();
             }
         });
-        recyclerView = viewGroup.findViewById(R.id.recyclerView);
+
+        recyclerView = rootView.findViewById(R.id.recyclerView);
 
         LinearLayoutManager layoutManager = new LinearLayoutManager(getContext());
         recyclerView.setLayoutManager(layoutManager);
 
+
         adapter = new NoteAdapter();
-        adapter.addItem(new Note(0,"0","서북구 불당동","","",
-                "오늘 토요일","0", "capture1.jpg","12월23일"));
-        adapter.addItem(new Note(1,"1","서북구 두정동","","",
-                "오늘 일요일","0", "capture1.jpg","12월24일"));
-        adapter.addItem(new Note(2,"0","서북구 신부동","","",
-                "오늘 월요일","0", "capture1.jpg","12월25일"));
+
+        adapter.addItem(new Note(0, "0", "강남구 삼성동", "", "","오늘 너무 행복해!", "0", null, "2월 10일"));
+        adapter.addItem(new Note(1, "1", "강남구 삼성동", "", "","친구와 재미있게 놀았어", "0", null, "2월 11일"));
+        adapter.addItem(new Note(2, "0", "강남구 역삼동", "", "","집에 왔는데 너무 피곤해 ㅠㅠ", "0", null, "2월 13일"));
 
         recyclerView.setAdapter(adapter);
 
@@ -88,8 +122,74 @@ public class Fragment1 extends Fragment {
             @Override
             public void onItemClick(NoteAdapter.ViewHolder holder, View view, int position) {
                 Note item = adapter.getItem(position);
-                Toast.makeText(getContext(),"아이템 선택됨: "+item.getContents(),Toast.LENGTH_SHORT).show();
+
+                Log.d(TAG, "아이템 선택됨 : " + item.get_id());
+
+                if (listener != null) {
+                    listener.showFragment2(item);
+                }
             }
         });
+
     }
+
+    /**
+     * 리스트 데이터 로딩
+     */
+    public int loadNoteListData() {
+        AppConstants.println("loadNoteListData called.");
+
+        String sql = "select _id, WEATHER, ADDRESS, LOCATION_X, LOCATION_Y, CONTENTS, MOOD, PICTURE, CREATE_DATE, MODIFY_DATE from " + NoteDatabase.TABLE_NOTE + " order by CREATE_DATE desc";
+
+        int recordCount = -1;
+        NoteDatabase database = NoteDatabase.getInstance(context);
+        if (database != null) {
+            Cursor outCursor = database.rawQuery(sql);
+
+            recordCount = outCursor.getCount();
+            AppConstants.println("record count : " + recordCount + "\n");
+
+            ArrayList<Note> items = new ArrayList<Note>();
+
+            for (int i = 0; i < recordCount; i++) {
+                outCursor.moveToNext();
+
+                int _id = outCursor.getInt(0);
+                String weather = outCursor.getString(1);
+                String address = outCursor.getString(2);
+                String locationX = outCursor.getString(3);
+                String locationY = outCursor.getString(4);
+                String contents = outCursor.getString(5);
+                String mood = outCursor.getString(6);
+                String picture = outCursor.getString(7);
+                String dateStr = outCursor.getString(8);
+                String createDateStr = null;
+                if (dateStr != null && dateStr.length() > 10) {
+                    try {
+                        Date inDate = AppConstants.dateFormat4.parse(dateStr);
+                        createDateStr = AppConstants.dateFormat3.format(inDate);
+                    } catch(Exception e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    createDateStr = "";
+                }
+
+                AppConstants.println("#" + i + " -> " + _id + ", " + weather + ", " +
+                        address + ", " + locationX + ", " + locationY + ", " + contents + ", " +
+                        mood + ", " + picture + ", " + createDateStr);
+
+                items.add(new Note(_id, weather, address, locationX, locationY, contents, mood, picture, createDateStr));
+            }
+
+            outCursor.close();
+
+            adapter.setItems(items);
+            adapter.notifyDataSetChanged();
+
+        }
+
+        return recordCount;
+    }
+
 }

@@ -1,6 +1,5 @@
 package com.zzangse.singlediary;
 
-
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -26,6 +25,7 @@ import androidx.fragment.app.Fragment;
 
 import com.github.channguyen.rsv.BuildConfig;
 import com.github.channguyen.rsv.RangeSliderView;
+
 
 import java.io.File;
 import java.io.FileOutputStream;
